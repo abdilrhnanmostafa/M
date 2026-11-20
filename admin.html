@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>لوحة تحكم الدوحة المحمدية - متقدمة</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Cairo', sans-serif;
+      background: #0e1e12;
+      color: #e8e0c8;
+      padding: 30px;
+      min-height: 100vh;
+    }
+    .dashboard-container { max-width: 1600px; margin: 0 auto; }
+    .card {
+      background: linear-gradient(145deg, #1a2e17, #0e2a0e);
+      border-radius: 35px;
+      padding: 25px;
+      margin-bottom: 30px;
+      border: 1px solid #d4af37;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+    }
+    h1, h2, h3 { color: #f5d742; margin-bottom: 15px; }
+    .btn {
+      background: #2e7d32;
+      border: none;
+      color: white;
+      padding: 10px 25px;
+      border-radius: 35px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 1rem;
+      transition: 0.2s;
+    }
+    .btn:hover { background: #1e5a20; transform: scale(1.02); }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 25px;
+      margin-bottom: 35px;
+    }
+    .stat-card {
+      background: #1f2e1b;
+      border-radius: 30px;
+      padding: 20px;
+      text-align: center;
+    }
+    .stat-number { font-size: 2.5rem; font-weight: 800; color: #f5e7a6; }
+    .table-wrapper { overflow-x: auto; border-radius: 25px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #1e2a1a;
+      border-radius: 25px;
+      min-width: 1000px;
+    }
+    th, td { padding: 14px 10px; text-align: center; border-bottom: 1px solid #4a6a3a; vertical-align: middle; }
+    th { background: #2e3e28; color: #f5d742; }
+    .btn-small {
+      background: #5a3e2b;
+      border: none;
+      color: white;
+      padding: 6px 14px;
+      border-radius: 30px;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+    .btn-small:hover { background: #7a5a3b; }
+    .btn-edit { background: #2e7d32; }
+    .btn-ban { background: #b33f2f; }
+    .btn-unban { background: #2e7d32; }
+    .banned-badge { background: #b33f2f; padding: 4px 12px; border-radius: 30px; font-size: 0.7rem; display: inline-block; }
+    .form-row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 25px; align-items: center; }
+    input, select, textarea {
+      background: #2e3e28;
+      border: 1px solid #b8945a;
+      padding: 12px;
+      border-radius: 40px;
+      color: white;
+      font-family: 'Cairo', sans-serif;
+      flex: 1;
+    }
+    .modal {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(5px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-content {
+      background: #1f2e1b;
+      border-radius: 45px;
+      padding: 30px;
+      max-width: 95%;
+      width: 1200px;
+      max-height: 85vh;
+      overflow-y: auto;
+      border: 2px solid #d4af37;
+    }
+    .close { float: left; font-size: 2rem; cursor: pointer; color: #d4af37; }
+    .task-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; }
+    .task-table th, .task-table td { border: 1px solid #4a6a3a; padding: 8px; text-align: center; }
+    .task-table th { background: #2e3e28; }
+    .status-yes { color: #8bc34a; }
+    .status-no { color: #ef9a9a; }
+    .user-name { font-weight: bold; color: #f5e7a6; }
+    footer { text-align: center; margin-top: 40px; font-size: 0.8rem; }
+
+    /* البث المباشر */
+    .live-now { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #2a3a24; border-radius: 25px; padding: 12px 16px; margin-bottom: 18px; }
+    .live-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 14px; border-radius: 30px; font-size: 0.8rem; font-weight: 800; background: #b33f2f; color: #fff; }
+    .live-pill.off { background: #6b5d48; }
+    .live-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; animation: blink 1.2s infinite; }
+    .live-pill.off .dot { animation: none; opacity: .6; }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+    .stream-item { background: #2a3a24; margin: 10px 0; padding: 12px 16px; border-radius: 25px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .stream-item .url { direction: ltr; font-size: 0.75rem; color: #b8945a; word-break: break-all; }
+    .stream-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .sql-box { background: #0b160c; border: 1px dashed #d4af37; border-radius: 20px; padding: 12px; font-family: monospace; font-size: 0.75rem; direction: ltr; text-align: left; white-space: pre-wrap; margin-top: 10px; }
+
+    .cam-wrap { position: relative; width: 100%; max-width: 640px; aspect-ratio: 16/9; background: #000; border-radius: 22px; overflow: hidden; border: 2px solid #d4af37; margin: 10px 0; }
+    .cam-wrap video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+    .cam-note { font-size: 0.75rem; color: #b8945a; margin-top: 6px; }
+    @media (max-width: 768px) {
+      body { padding: 15px; }
+      th, td { padding: 8px 5px; font-size: 0.75rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="dashboard-container">
+  <div id="keyScreen" class="card" style="max-width: 500px; margin: 50px auto; text-align:center;">
+    <div style="font-size:3rem;">🔑</div>
+    <h2>لوحة تحكم المشرف المتقدمة</h2>
+    <p>أدخل مفتاح الإدارة الحالي من Supabase. لا تشارك هذا المفتاح مع أي شخص.</p>
+    <div class="form-row" style="flex-direction:column;">
+      <input type="password" id="serviceKey" placeholder="مفتاح الإدارة الحالي" dir="ltr" style="font-family: monospace;">
+      <button id="connectBtn" class="btn">🔌 الاتصال</button>
+    </div>
+    <div id="statusArea" style="margin-top:15px;"></div>
+  </div>
+
+  <div id="adminPanel" style="display: none;">
+    <div class="card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+      <h1><i class="fas fa-chalkboard-user"></i> لوحة الإدارة المتقدمة</h1>
+      <button id="disconnectBtn" class="btn-small" style="background:#8b2c1d;">تغيير المفتاح</button>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card"><i class="fas fa-users"></i><div class="stat-number" id="totalUsers">0</div><div>إجمالي المستخدمين</div></div>
+      <div class="stat-card"><i class="fas fa-ban"></i><div class="stat-number" id="bannedCount">0</div><div>محظورين</div></div>
+      <div class="stat-card"><i class="fas fa-check-circle"></i><div class="stat-number" id="level1Completed">0</div><div>أكملوا المستوى الأول</div></div>
+      <div class="stat-card"><i class="fas fa-chart-line"></i><div class="stat-number" id="level2Completed">0</div><div>أكملوا المستوى الثاني</div></div>
+      <div class="stat-card"><i class="fas fa-crown"></i><div class="stat-number" id="level3Completed">0</div><div>أكملوا المستوى الثالث</div></div>
+    </div>
+
+    <div class="card">
+      <h3><i class="fas fa-table-list"></i> إدارة المستخدمين (مع التحكم في المستويات)</h3>
+      <div class="table-wrapper">
+        <table id="usersTable">
+          <thead>
+            <tr><th>الاسم</th><th>البريد</th><th>المستوى1</th><th>المستوى2</th><th>المستوى3</th><th>المستوى4</th><th>الحالة</th><th>التحكم</th><th>عرض الجدول</th><th>حظر/إلغاء</th></tr>
+          </thead>
+          <tbody id="usersTableBody"><tr><td colspan="10">أدخل المفتاح أولاً...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== البث المباشر ===== -->
+    <div class="card">
+      <h3><i class="fas fa-video"></i> إدارة البث المباشر</h3>
+      <div class="live-now">
+        <span class="live-pill off" id="adminLivePill"><span class="dot"></span><span id="adminLiveText">لا يوجد بث</span></span>
+        <span id="adminLiveTitle" style="font-weight:bold;"></span>
+        <button id="stopAllLiveBtn" class="btn-small btn-ban" style="margin-right:auto; display:none;">⏹ إيقاف البث الآن</button>
+      </div>
+      <div class="form-row">
+        <input type="text" id="liveTitleInput" placeholder="عنوان البث (مثال: درس الشمائل)">
+        <input type="text" id="liveUrlInput" placeholder="رابط البث (يوتيوب / فيسبوك / رابط تضمين https)" dir="ltr">
+      </div>
+      <div class="form-row">
+        <textarea id="liveDescInput" rows="2" placeholder="وصف مختصر (اختياري)"></textarea>
+        <button id="startLiveBtn" class="btn">🔴 بدء البث للجميع</button>
+        <button id="saveLiveDraftBtn" class="btn-small">💾 حفظ دون تشغيل</button>
+      </div>
+      <h4 style="color:#f5d742; margin:14px 0 8px;"><i class="fas fa-camera"></i> التصوير المباشر بالكاميرا</h4>
+      <div class="form-row">
+        <input type="text" id="camTitleInput" placeholder="عنوان البث بالكاميرا (مثال: درس اليوم)">
+        <input type="password" id="liveAdminSecret" placeholder="رمز تشغيل البث الآمن (LiveKit)" dir="ltr" autocomplete="off">
+        <select id="camSelect"><option value="">الكاميرا الافتراضية</option></select>
+        <label style="display:flex; align-items:center; gap:6px;"><input type="checkbox" id="camMic" checked style="flex:none;"> الميكروفون</label>
+      </div>
+      <div class="cam-wrap"><video id="camPreview" autoplay playsinline muted></video></div>
+      <div class="form-row" style="margin-bottom:6px;">
+        <button id="camPreviewBtn" class="btn-small">👁 معاينة الكاميرا</button>
+        <button id="camStartBtn" class="btn">🔴 بدء التصوير والبث للجميع</button>
+        <button id="camStopBtn" class="btn-small btn-ban" style="display:none;">⏹ إيقاف التصوير</button>
+        <span id="camViewers" style="font-weight:bold;"></span>
+      </div>
+      <div class="cam-note">يبدأ المدير البث من هنا فقط. المستخدمون يشاهدون من التطبيق ولا يمكنهم تشغيل الكاميرا أو الميكروفون. أبقِ لوحة التحكم مفتوحة طوال البث.</div>
+      <h4 style="color:#f5d742; margin:18px 0 10px;">سجل البثوث</h4>
+      <div id="streamsList"></div>
+      <div id="liveSetupHint" style="display:none;">
+        <p style="color:#ef9a9a; margin-top:10px;">⚠️ جدول <code>live_streams</code> غير موجود. شغّل هذا الكود مرة واحدة في Supabase ← SQL Editor ثم اضغط تحديث:</p>
+        <div class="sql-box" id="sqlBox"></div>
+        <button id="copySqlBtn" class="btn-small" style="margin-top:8px;">📋 نسخ الكود</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3><i class="fas fa-bell"></i> إدارة الإشعارات (تظهر لجميع المستخدمين)</h3>
+      <div class="form-row">
+        <input type="text" id="notifTitle" placeholder="عنوان الإشعار">
+        <textarea id="notifBody" rows="2" placeholder="نص الإشعار..."></textarea>
+        <button id="addNotifBtn" class="btn">➕ إضافة</button>
+      </div>
+      <label style="display:flex; align-items:center; gap:8px; margin:-10px 0 14px;"><input type="checkbox" id="notifPush" checked style="flex:none;"> 📲 إرسال إشعار للهاتف (يصل والتطبيق مغلق بصوت الهاتف)</label>
+      <div id="notificationsList"></div>
+    </div>
+
+    <div class="card">
+      <h3><i class="fas fa-cog"></i> أدوات</h3>
+      <button id="testSoundBtn" class="btn-small">🔊 اختبار الصوت</button>
+      <button id="refreshBtn" class="btn-small">🔄 تحديث البيانات</button>
+    </div>
+    <footer>© الدوحة المحمدية | للإستفسار: 01141056548</footer>
+  </div>
+</div>
+
+<script>
+  const SUPABASE_URL = "https://pxgrawollyqwixgupnrx.supabase.co";
+  
+  // تعريف المستويات (مطابق للتطبيق)
+  const LEVELS = {
+    1: { name: "المستوى الأول", totalDays: 100, rows: ["استهلال","الصبح في وقته","سنة الصبح","أذكار الصباح","سنن الإستيقاظ","مذاكرة","الورد العام","حفظ العين","الظهر","سنن الظهر","بر والدين","العصر","سنة العصر","سنن الأكل","أذكار المساء","المغرب","حفظ قرآن","العشاء","الشفع والوتر","سورة الملك","الإقلاع عن ذنب","قيام الليل","سنن النوم","استهلال"] },
+    2: { name: "المستوى الثاني", totalDays: 150, rows: ["الصبح + السنن","الاستهلال","أذكار الصباح","سورة يس","متابعة السنن","حفظ اللسان","الورد العام","الظهر + السنن","العصر + السنن","أذكار المساء","المغرب + السنن","العشاء + شفع","سورة الملك","الإقلاع عن ذنب","قيام الليل"] },
+    3: { name: "المستوى الثالث", totalDays: 300, rows: ["الصبح + السنن","الاستهلال + يس","أذكار الصباح","متابعة السنن","بر والدين","آفات اللسان","الورد العام","الظهر + السنن","العصر + السنن","أذكار المساء","المغرب + السنن","القرآن","العشاء + شفع","الملك","الإقلاع عن ذنب","قيام الليل"] },
+    4: { name: "المستوى الرابع", totalDays: null, rows: ["الاستهلال","الصبح","الظهر","العصر","المغرب","العشاء","الشفع والوتر","الضحى","قيام الليل","أذكار الصباح","الورد العام","أذكار المساء","متابعة السنن","الإقلاع عن ذنب","مراقبة القلب","بر الوالدين","فعل الخير"] }
+  };
+
+  const LIVE_SQL = `create table if not exists public.live_streams (
+  id bigint generated always as identity primary key,
+  title text,
+  description text,
+  url text not null,
+  is_live boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+alter table public.live_streams enable row level security;
+
+create policy "authenticated can read live_streams"
+  on public.live_streams for select
+  to authenticated using (true);`;
+
+  let supabaseAdmin = null;
+  let adminKey = '';
+  let bannedUsersMap = new Map();
+  let notifications = [];
+
+  function showMessage(msg, isErr = false) {
+    const div = document.createElement('div');
+    div.style.cssText = `position:fixed; bottom:20px; right:20px; background:${isErr ? '#b33f2f' : '#2e7d32'}; color:white; padding:12px 24px; border-radius:40px; z-index:10000; font-weight:bold;`;
+    div.innerText = msg;
+    document.body.appendChild(div);
+    setTimeout(() => div.remove(), isErr ? 9000 : 4000);
+  }
+
+  // ---------- الحظر ----------
+  async function loadBannedUsers() {
+    if (!supabaseAdmin) return;
+    const { data } = await supabaseAdmin.from('banned_users').select('*');
+    bannedUsersMap.clear();
+    if (data) data.forEach(b => bannedUsersMap.set(b.user_id, b));
+  }
+  async function banUser(userId) {
+    if (!supabaseAdmin) return;
+    await supabaseAdmin.from('banned_users').insert({ user_id: userId, banned_at: new Date().toISOString(), banned_by: "admin" });
+    await loadBannedUsers();
+    refreshDashboard();
+    showMessage("✅ تم حظر المستخدم");
+  }
+  async function unbanUser(userId) {
+    if (!supabaseAdmin) return;
+    await supabaseAdmin.from('banned_users').delete().eq('user_id', userId);
+    await loadBannedUsers();
+    refreshDashboard();
+    showMessage("✅ تم إلغاء الحظر");
+  }
+
+  // ---------- عرض جدول المهام الكامل للمستخدم ----------
+  async function showFullUserTasks(userId, userName) {
+    if (!supabaseAdmin) return;
+    const { data: tasks, error } = await supabaseAdmin.from('user_tasks').select('*').eq('user_id', userId).order('date_key', { ascending: false });
+    if (error || !tasks?.length) { showMessage("لا توجد مهام لهذا المستخدم", true); return; }
+    // تجميع حسب (المستوى، اليوم، التاريخ)
+    const daysMap = new Map();
+    for (const t of tasks) {
+      const key = `${t.level}_${t.day}_${t.date_key}`;
+      if (!daysMap.has(key)) daysMap.set(key, { level: t.level, day: t.day, date_key: t.date_key, tasks: new Array(LEVELS[t.level]?.rows?.length || 30).fill(null) });
+      daysMap.get(key).tasks[t.task_index] = t.status;
+    }
+    const sorted = Array.from(daysMap.values()).sort((a,b) => (a.date_key > b.date_key ? -1 : 1));
+    
+    let html = `<h3>📋 جدول المهام الكامل للمستخدم: ${userName}</h3>`;
+    for (const dayData of sorted) {
+      const level = dayData.level;
+      const rows = LEVELS[level]?.rows || [];
+      let completed = 0;
+      let tableHtml = `<div style="margin-top:20px; border-top:1px solid #d4af37; padding-top:15px;"><h4>المستوى ${level} - اليوم ${dayData.day} (${dayData.date_key})</h4>
+        <table class="task-table"><thead><tr><th>#</th><th>العمل</th><th>التقييم</th></tr></thead><tbody>`;
+      for (let i=0; i<rows.length; i++) {
+        const status = dayData.tasks[i];
+        let statusText = '', cls = '';
+        if (status === true) { statusText = '✅ مؤدى'; cls = 'status-yes'; completed++; }
+        else if (status === false) { statusText = '❌ لم يؤد'; cls = 'status-no'; }
+        else { statusText = '⚪ غير مقيم'; }
+        tableHtml += `<tr><td>${i+1}</td><td style="text-align:right;">${rows[i]}</td><td class="${cls}">${statusText}</td></tr>`;
+      }
+      tableHtml += `</tbody></table><div class="small-text">✅ اكتمل: ${completed}/${rows.length} (${Math.round(completed/rows.length*100)}%)</div></div>`;
+      html += tableHtml;
+    }
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `<div class="modal-content"><span class="close">&times;</span>${html}</div>`;
+    document.body.appendChild(modal);
+    modal.querySelector('.close').onclick = () => modal.remove();
+  }
+
+  // ---------- نافذة تعديل تقدم المستخدم ----------
+  async function showEditProgress(userId, userName, currentProgress) {
+    if (!supabaseAdmin) return;
+    let levelsHtml = '';
+    for (let lvl=1; lvl<=4; lvl++) {
+      const prog = currentProgress[lvl] || { day: 1, completed: false };
+      const totalDays = LEVELS[lvl].totalDays === null ? 'مفتوح' : LEVELS[lvl].totalDays;
+      levelsHtml += `
+        <div style="margin-bottom:15px; padding:10px; background:#2a3a24; border-radius:25px;">
+          <strong>${LEVELS[lvl].name}</strong><br>
+          اليوم الحالي: <input type="number" id="day_${lvl}" value="${prog.day}" min="1" ${lvl===4 ? '' : `max="${LEVELS[lvl].totalDays}"`} style="width:80px; display:inline-block;">
+          / ${totalDays}<br>
+          مكتمل: <input type="checkbox" id="completed_${lvl}" ${prog.completed ? 'checked' : ''}>
+        </div>
+      `;
+    }
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `<div class="modal-content" style="max-width:500px;">
+      <span class="close">&times;</span>
+      <h3>تعديل تقدم المستخدم: ${userName}</h3>
+      ${levelsHtml}
+      <button id="saveProgressBtn" class="btn" style="margin-top:15px;">💾 حفظ التغييرات</button>
+    </div>`;
+    document.body.appendChild(modal);
+    modal.querySelector('.close').onclick = () => modal.remove();
+    document.getElementById('saveProgressBtn').onclick = async () => {
+      for (let lvl=1; lvl<=4; lvl++) {
+        const newDay = parseInt(document.getElementById(`day_${lvl}`).value);
+        const newCompleted = document.getElementById(`completed_${lvl}`).checked;
+        await supabaseAdmin.from('user_progress').upsert({
+          user_id: userId,
+          level: lvl,
+          current_day: newDay,
+          level_completed: newCompleted
+        }, { onConflict: 'user_id, level' });
+      }
+      showMessage(`✅ تم تحديث تقدم المستخدم ${userName}`);
+      modal.remove();
+      await refreshDashboard();
+    };
+  }
+
+  // ---------- جلب المستخدمين والتقدم ----------
+  async function fetchAllUsers() {
+    if (!supabaseAdmin) return [];
+    try {
+      const { data: users, error } = await supabaseAdmin.auth.admin.listUsers();
+      if (error) throw error;
+      const { data: progresses } = await supabaseAdmin.from('user_progress').select('*');
+      const { data: tasks } = await supabaseAdmin.from('user_tasks').select('user_id, date_key');
+      const lastActivity = new Map();
+      if (tasks) tasks.forEach(t => { const ex = lastActivity.get(t.user_id); if (!ex || t.date_key > ex) lastActivity.set(t.user_id, t.date_key); });
+      const progMap = new Map();
+      if (progresses) progresses.forEach(p => { if (!progMap.has(p.user_id)) progMap.set(p.user_id, {}); progMap.get(p.user_id)[p.level] = { day: p.current_day, completed: p.level_completed }; });
+      await loadBannedUsers();
+      return users.users.map(u => ({
+        id: u.id,
+        name: u.user_metadata?.name || u.email?.split('@')[0] || "مستخدم",
+        email: u.email,
+        levels: progMap.get(u.id) || {},
+        lastActivity: lastActivity.get(u.id) || "—",
+        isBanned: bannedUsersMap.has(u.id)
+      }));
+    } catch(e) { showMessage("خطأ في جلب المستخدمين: " + e.message, true); return []; }
+  }
+
+  function computeStats(users) {
+    let total = users.length, banned = users.filter(u=>u.isBanned).length, l1=0,l2=0,l3=0;
+    users.forEach(u => {
+      if (u.levels[1]?.completed) l1++;
+      if (u.levels[2]?.completed) l2++;
+      if (u.levels[3]?.completed) l3++;
+    });
+    return { total, banned, l1, l2, l3 };
+  }
+
+  function escapeHtml(str) { return (str || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+  function renderUsers(users) {
+    const tbody = document.getElementById('usersTableBody');
+    if (!users.length) { tbody.innerHTML = '<tr><td colspan="10">لا يوجد مستخدمون مسجلون بعد.</td></tr>'; return; }
+    let html = '';
+    users.forEach(u => {
+      const l1 = u.levels[1] ? `يوم ${u.levels[1].day} ${u.levels[1].completed ? '✅' : '🔄'}` : '🔒';
+      const l2 = u.levels[2] ? `يوم ${u.levels[2].day} ${u.levels[2].completed ? '✅' : '🔄'}` : '🔒';
+      const l3 = u.levels[3] ? `يوم ${u.levels[3].day} ${u.levels[3].completed ? '✅' : '🔄'}` : '🔒';
+      const l4 = u.levels[4] ? `يوم ${u.levels[4].day} ${u.levels[4].completed ? '✅' : '🔄'}` : '—';
+      const statusBadge = u.isBanned ? '<span class="banned-badge">🚫 محظور</span>' : '<span style="background:#2e7d32; padding:4px 12px; border-radius:30px;">✅ نشط</span>';
+      html += `<tr>
+        <td class="user-name">${escapeHtml(u.name)}</td>
+        <td>${escapeHtml(u.email)}</td>
+        <td>${l1}</td><td>${l2}</td><td>${l3}</td><td>${l4}</td>
+        <td>${statusBadge}</td>
+        <td><button class="btn-small btn-edit editProgressBtn" data-user='${JSON.stringify(u).replace(/'/g, "&#39;")}'>✏️ تعديل المستوى</button></td>
+        <td><button class="btn-small viewTasksBtn" data-user-id="${u.id}" data-user-name="${escapeHtml(u.name)}">📊 عرض الجدول الكامل</button></td>
+        <td>${u.isBanned ? `<button class="btn-small btn-unban" data-user="${u.id}">🔓 إلغاء الحظر</button>` : `<button class="btn-small btn-ban" data-user="${u.id}">🚫 حظر</button>`}</td>
+      </tr>`;
+    });
+    tbody.innerHTML = html;
+    document.querySelectorAll('.viewTasksBtn').forEach(btn => {
+      btn.addEventListener('click', () => showFullUserTasks(btn.dataset.userId, btn.dataset.userName));
+    });
+    document.querySelectorAll('.editProgressBtn').forEach(btn => {
+      const user = JSON.parse(btn.dataset.user);
+      btn.addEventListener('click', () => showEditProgress(user.id, user.name, user.levels));
+    });
+    document.querySelectorAll('.btn-ban').forEach(btn => btn.addEventListener('click', async () => { if(confirm("حظر هذا المستخدم؟")) await banUser(btn.dataset.user); }));
+    document.querySelectorAll('.btn-unban').forEach(btn => btn.addEventListener('click', async () => { if(confirm("إلغاء الحظر؟")) await unbanUser(btn.dataset.user); }));
+  }
+
+  async function refreshDashboard() {
+    if (!supabaseAdmin) return;
+    showMessage("جاري تحديث البيانات...");
+    const users = await fetchAllUsers();
+    const stats = computeStats(users);
+    document.getElementById('totalUsers').innerText = stats.total;
+    document.getElementById('bannedCount').innerText = stats.banned;
+    document.getElementById('level1Completed').innerText = stats.l1;
+    document.getElementById('level2Completed').innerText = stats.l2;
+    document.getElementById('level3Completed').innerText = stats.l3;
+    renderUsers(users);
+    await loadNotificationsFromDB();
+    await loadStreams();
+    showMessage(`✅ تم تحديث ${stats.total} مستخدم`);
+  }
+
+  // ---------- البث المباشر ----------
+  function isValidHttps(u) {
+    try { return new URL(u).protocol === 'https:'; } catch (e) { return false; }
+  }
+
+  async function loadStreams() {
+    if (!supabaseAdmin) return;
+    const hint = document.getElementById('liveSetupHint');
+    const list = document.getElementById('streamsList');
+    const { data, error } = await supabaseAdmin.from('live_streams').select('*').order('created_at', { ascending: false }).limit(30);
+    if (error) {
+      // الجدول غير موجود أو خطأ آخر
+      document.getElementById('sqlBox').textContent = LIVE_SQL;
+      hint.style.display = 'block';
+      list.innerHTML = '';
+      setLiveStatus(null);
+      console.error(error);
+      return;
+    }
+    hint.style.display = 'none';
+    setLiveStatus((data || []).find(s => s.is_live) || null);
+    if (!data || data.length === 0) { list.innerHTML = '<div>لا توجد بثوث محفوظة بعد.</div>'; return; }
+    list.innerHTML = data.map(s => `
+      <div class="stream-item">
+        <div>
+          <strong>${escapeHtml(s.title || 'بدون عنوان')}</strong>
+          ${s.is_live ? '<span class="live-pill" style="margin-right:8px;"><span class="dot"></span>مباشر</span>' : ''}
+          <div class="url">${escapeHtml(s.url)}</div>
+          <small>${new Date(s.created_at).toLocaleString('ar-EG')}</small>
+        </div>
+        <div class="stream-actions">
+          ${s.is_live
+            ? `<button class="btn-small btn-ban" data-act="stop" data-id="${s.id}">⏹ إيقاف</button>`
+            : (s.url === CAM_URL ? '<span class="cam-note">📷 بث كاميرا منتهٍ</span>' : `<button class="btn-small btn-edit" data-act="start" data-id="${s.id}">▶️ تشغيل</button>`)}
+          <button class="btn-small" data-act="delete" data-id="${s.id}" style="background:#8b2c1d;">حذف</button>
+        </div>
+      </div>`).join('');
+    list.querySelectorAll('button[data-act]').forEach(btn => btn.addEventListener('click', () => streamAction(btn.dataset.act, btn.dataset.id)));
+  }
+
+  function setLiveStatus(stream) {
+    const pill = document.getElementById('adminLivePill');
+    pill.classList.toggle('off', !stream);
+    document.getElementById('adminLiveText').innerText = stream ? 'بث مباشر الآن' : 'لا يوجد بث';
+    document.getElementById('adminLiveTitle').innerText = stream ? (stream.title || '') : '';
+    document.getElementById('stopAllLiveBtn').style.display = stream ? 'inline-block' : 'none';
+  }
+
+  async function stopAllLive(keepCamera) {
+    if (!keepCamera && (camStream || camRoom)) await stopCameraBroadcast(true);
+    const { error } = await supabaseAdmin.from('live_streams').update({ is_live: false }).eq('is_live', true);
+    return error;
+  }
+
+  async function streamAction(act, id) {
+    if (!supabaseAdmin) return;
+    if (act === 'start') {
+      // بث واحد فقط في نفس الوقت
+      let err = await stopAllLive();
+      if (err) { showMessage("فشل: " + err.message, true); return; }
+      const { error } = await supabaseAdmin.from('live_streams').update({ is_live: true }).eq('id', id);
+      if (error) { showMessage("فشل: " + error.message, true); return; }
+      showMessage("🔴 تم تشغيل البث لجميع المستخدمين");
+    } else if (act === 'stop') {
+      if (camStream && String(camStreamId) === String(id)) { await stopCameraBroadcast(); return; }
+      const { error } = await supabaseAdmin.from('live_streams').update({ is_live: false }).eq('id', id);
+      if (error) { showMessage("فشل: " + error.message, true); return; }
+      showMessage("⏹ تم إيقاف البث");
+    } else if (act === 'delete') {
+      if (!confirm("حذف هذا البث من السجل؟")) return;
+      const { error } = await supabaseAdmin.from('live_streams').delete().eq('id', id);
+      if (error) { showMessage("فشل: " + error.message, true); return; }
+      showMessage("تم الحذف");
+    }
+    await loadStreams();
+  }
+
+  async function addStream(goLive) {
+    const title = document.getElementById('liveTitleInput').value.trim();
+    const url = document.getElementById('liveUrlInput').value.trim();
+    const description = document.getElementById('liveDescInput').value.trim();
+    if (!url) { showMessage("أدخل رابط البث", true); return; }
+    if (!isValidHttps(url)) { showMessage("الرابط يجب أن يبدأ بـ https://", true); return; }
+    if (goLive) {
+      const err = await stopAllLive();
+      if (err) { showMessage("فشل: " + err.message, true); await loadStreams(); return; }
+    }
+    const { error } = await supabaseAdmin.from('live_streams').insert({
+      title: title || 'البث المباشر',
+      description,
+      url,
+      is_live: goLive
+    });
+    if (error) { showMessage("فشل الإضافة: " + error.message, true); await loadStreams(); return; }
+    showMessage(goLive ? "🔴 بدأ البث لجميع المستخدمين" : "💾 تم حفظ البث");
+    document.getElementById('liveTitleInput').value = '';
+    document.getElementById('liveUrlInput').value = '';
+    document.getElementById('liveDescInput').value = '';
+    await loadStreams();
+  }
+
+
+  // ---------- البث المباشر عبر LiveKit SFU ----------
+  const CAM_URL = 'livekit://camera';
+  let camStream = null, camRoom = null, camStreamId = null;
+
+  function liveRoomName(id) { return `dawha-live-${String(id).replace(/[^a-zA-Z0-9_-]/g, '')}`; }
+
+  function updateViewerCount() {
+    const el = document.getElementById('camViewers');
+    const count = camRoom ? camRoom.remoteParticipants.size : 0;
+    el.textContent = camRoom ? `👥 المشاهدون: ${count}` : '';
+  }
+
+  async function loadCameras() {
+    try {
+      const devs = await navigator.mediaDevices.enumerateDevices();
+      const sel = document.getElementById('camSelect');
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">الكاميرا الافتراضية</option>' +
+        devs.filter(d => d.kind === 'videoinput').map((d, i) => `<option value="${escapeHtml(d.deviceId)}">${escapeHtml(d.label || ('كاميرا ' + (i + 1)))}</option>`).join('');
+      sel.value = cur;
+    } catch (e) {}
+  }
+
+  async function openCamera() {
+    if (!navigator.mediaDevices?.getUserMedia) { showMessage("المتصفح لا يدعم الكاميرا (يلزم رابط https)", true); return null; }
+    if (camStream) camStream.getTracks().forEach(t => t.stop());
+    const deviceId = document.getElementById('camSelect').value;
+    const wantMic = document.getElementById('camMic').checked;
+    try {
+      camStream = await navigator.mediaDevices.getUserMedia({
+        video: Object.assign({ width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24, max: 30 } }, deviceId ? { deviceId: { exact: deviceId } } : {}),
+        audio: wantMic ? { echoCancellation: true, noiseSuppression: true } : false
+      });
+      document.getElementById('camPreview').srcObject = camStream;
+      await loadCameras();
+      return camStream;
+    } catch (e) {
+      camStream = null;
+      let hint = e.message || e.name;
+      if (!window.isSecureContext) hint = "الصفحة مفتوحة بدون https. افتحها من رابط HTTPS";
+      else if (e.name === 'NotAllowedError') hint = "إذن الكاميرا أو الميكروفون مرفوض. اسمح بهما من إعدادات المتصفح";
+      else if (e.name === 'NotFoundError') hint = "لم يتم العثور على كاميرا في هذا الجهاز";
+      else if (e.name === 'NotReadableError') hint = "الكاميرا مستخدمة من تطبيق آخر، أغلقه ثم أعد المحاولة";
+      showMessage("تعذر فتح الكاميرا: " + hint, true);
+      return null;
+    }
+  }
+
+  async function requestLiveKitToken(role, roomName) {
+    const secret = document.getElementById('liveAdminSecret')?.value.trim();
+    if (role === 'host' && !secret) throw new Error('أدخل رمز تشغيل البث الآمن الذي ستضيفه في إعدادات Supabase.');
+    const headers = { 'Content-Type': 'application/json', 'apikey': 'sb_publishable_oJku4kOAEJzWfiHiduzsJw_bawZT0NO' };
+    if (role === 'host') headers['x-livekit-admin-secret'] = secret;
+    const { data: { session } } = await supabaseAdmin.auth.getSession().catch(() => ({ data: { session: null } }));
+    if (role === 'viewer') {
+      if (!session?.access_token) throw new Error('يجب تسجيل الدخول لمشاهدة البث.');
+      headers.Authorization = `Bearer ${session.access_token}`;
+    }
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/livekit-token`, {
+      method: 'POST', headers, body: JSON.stringify({ role, roomName, identity: role === 'host' ? `admin-${Date.now()}` : `viewer-${crypto.randomUUID()}` })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || `تعذر إصدار رمز البث (${response.status})`);
+    return result;
+  }
+
+  async function startCameraBroadcast() {
+    if (camRoom) { showMessage('البث يعمل بالفعل'); return; }
+    if (!window.LivekitClient?.Room) { showMessage('تعذر تحميل مكتبة البث. حدّث الصفحة وحاول مرة أخرى.', true); return; }
+    const stream = await openCamera();
+    if (!stream) return;
+    const title = document.getElementById('camTitleInput').value.trim() || 'بث مباشر';
+    const err = await stopAllLive(true);
+    if (err) { stream.getTracks().forEach(t => t.stop()); camStream = null; document.getElementById('camPreview').srcObject = null; showMessage('فشل إيقاف البث السابق: ' + err.message, true); return; }
+    const { data, error } = await supabaseAdmin.from('live_streams').insert({ title, description: '', url: CAM_URL, is_live: true }).select().single();
+    if (error) { stream.getTracks().forEach(t => t.stop()); camStream = null; document.getElementById('camPreview').srcObject = null; showMessage('فشل إنشاء سجل البث: ' + error.message, true); return; }
+    camStreamId = data.id;
+    const roomName = liveRoomName(data.id);
+    try {
+      const auth = await requestLiveKitToken('host', roomName);
+      camRoom = new LivekitClient.Room({ adaptiveStream: true, dynacast: true });
+      camRoom.on(LivekitClient.RoomEvent.ParticipantConnected, updateViewerCount);
+      camRoom.on(LivekitClient.RoomEvent.ParticipantDisconnected, updateViewerCount);
+      await camRoom.connect(auth.serverUrl, auth.token);
+      for (const track of stream.getTracks()) {
+        const source = track.kind === 'video' ? LivekitClient.Track.Source.Camera : LivekitClient.Track.Source.Microphone;
+        await camRoom.localParticipant.publishTrack(track, { source, name: track.kind === 'video' ? 'camera' : 'microphone' });
+      }
+      document.getElementById('camStartBtn').style.display = 'none';
+      document.getElementById('camStopBtn').style.display = 'inline-block';
+      updateViewerCount();
+      showMessage('🔴 بدأ البث المباشر. المستخدمون يشاهدونه من التطبيق الآن.');
+      await loadStreams();
+    } catch (e) {
+      console.error('LiveKit host error', e);
+      if (camRoom) { try { await camRoom.disconnect(); } catch (_) {} camRoom = null; }
+      stream.getTracks().forEach(t => t.stop()); camStream = null;
+      document.getElementById('camPreview').srcObject = null;
+      await supabaseAdmin.from('live_streams').update({ is_live: false }).eq('id', camStreamId);
+      camStreamId = null;
+      showMessage('تعذر بدء البث: ' + e.message, true);
+      await loadStreams();
+    }
+  }
+
+  async function stopCameraBroadcast(silent) {
+    if (camRoom) { try { await camRoom.disconnect(); } catch (e) {} camRoom = null; }
+    if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+    document.getElementById('camPreview').srcObject = null;
+    document.getElementById('camStartBtn').style.display = 'inline-block';
+    document.getElementById('camStopBtn').style.display = 'none';
+    updateViewerCount();
+    if (camStreamId && supabaseAdmin) await supabaseAdmin.from('live_streams').update({ is_live: false }).eq('id', camStreamId);
+    camStreamId = null;
+    if (!silent) { showMessage('⏹ تم إيقاف البث المباشر'); await loadStreams(); }
+  }
+
+  window.addEventListener('beforeunload', (e) => { if (camStream || camRoom) { e.preventDefault(); e.returnValue = ''; } });
+
+  // ---------- الإشعارات ----------
+  async function loadNotificationsFromDB() {
+    if (!supabaseAdmin) return;
+    const { data, error } = await supabaseAdmin.from('notifications').select('*').order('created_at', { ascending: false });
+    if (error) { console.error(error); return; }
+    const container = document.getElementById('notificationsList');
+    if (!data || data.length === 0) { container.innerHTML = '<div>لا توجد إشعارات. أضف إشعاراً جديداً.</div>'; return; }
+    let html = '';
+    data.forEach(n => {
+      html += `<div class="notification-item" style="background:#2a3a24; margin:10px 0; padding:12px; border-radius:25px; display:flex; justify-content:space-between;">
+        <div><strong>${escapeHtml(n.title)}</strong><br><small>${escapeHtml(n.body)}</small><br><span class="small-text">${new Date(n.created_at).toLocaleString('ar-EG')}</span></div>
+        <button class="btn-small delNotifBtn" data-id="${n.id}" style="background:#8b2c1d;">حذف</button>
+      </div>`;
+    });
+    container.innerHTML = html;
+    document.querySelectorAll('.delNotifBtn').forEach(btn => btn.addEventListener('click', async () => {
+      await supabaseAdmin.from('notifications').delete().eq('id', btn.dataset.id);
+      await loadNotificationsFromDB();
+      showMessage("تم حذف الإشعار");
+    }));
+  }
+  async function sendPushToUsers(title, body) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + adminKey, 'apikey': adminKey },
+        body: JSON.stringify({ title, body })
+      });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) { showMessage("تم حفظ الإشعار لكن فشل إرسال إشعار الهاتف: " + (out.error || res.status), true); return; }
+      showMessage(`📲 أُرسل إشعار الهاتف إلى ${out.sent} جهاز` + (out.total === 0 ? ' (لا يوجد مستخدمون فعّلوا الإشعارات بعد)' : '') + (out.failed ? ` — فشل ${out.failed}` : ''));
+    } catch (e) { showMessage("تم حفظ الإشعار لكن تعذر الاتصال بدالة الإرسال: " + e.message, true); }
+  }
+  async function addNotificationToDB(title, body) {
+    if (!title.trim() || !body.trim()) { showMessage("يرجى إدخال عنوان ونص", true); return; }
+    const { error } = await supabaseAdmin.from('notifications').insert({ title, body, created_at: new Date().toISOString() });
+    if (error) { showMessage("فشل الإضافة: " + error.message, true); return; }
+    if (document.getElementById('notifPush')?.checked) {
+      await sendPushToUsers(title, body);
+    } else {
+      showMessage("✅ تم إضافة الإشعار (داخل التطبيق فقط)");
+    }
+    document.getElementById('notifTitle').value = '';
+    document.getElementById('notifBody').value = '';
+    await loadNotificationsFromDB();
+  }
+
+  const SOUND_URL = "https://d.top4top.io/m_3779rw3af0.mp3";
+  function playTestSound() { new Audio(SOUND_URL).play().catch(e => showMessage("لا يمكن تشغيل الصوت", true)); showMessage("🔊 اختبار الصوت"); }
+
+  async function connectWithServiceKey(key) {
+    if (!key.trim()) { showMessage("الرجاء إدخال المفتاح", true); return false; }
+    try {
+      const client = window.supabase.createClient(SUPABASE_URL, key, { auth: { persistSession: false } });
+      const { error } = await client.from('user_progress').select('count', { count: 'exact', head: true });
+      if (error) throw error;
+      supabaseAdmin = client;
+      adminKey = key;
+      return true;
+    } catch (e) { showMessage("فشل الاتصال: " + e.message, true); return false; }
+  }
+
+  document.getElementById('connectBtn').addEventListener('click', async () => {
+    const key = document.getElementById('serviceKey').value.trim();
+    const statusDiv = document.getElementById('statusArea');
+    statusDiv.innerHTML = '<div class="small-text">جاري التحقق...</div>';
+    const ok = await connectWithServiceKey(key);
+    if (ok) {
+      statusDiv.innerHTML = '<div class="success" style="color:#8bc34a;">✅ الاتصال ناجح!</div>';
+      document.getElementById('keyScreen').style.display = 'none';
+      document.getElementById('adminPanel').style.display = 'block';
+      await refreshDashboard();
+    } else {
+      statusDiv.innerHTML = '<div class="error" style="color:#ef9a9a;">❌ فشل الاتصال. تأكد من استخدام service_role الصحيح.</div>';
+    }
+  });
+  document.getElementById('disconnectBtn')?.addEventListener('click', async () => {
+    if (camStream) await stopCameraBroadcast(true);
+    supabaseAdmin = null;
+    document.getElementById('keyScreen').style.display = 'block';
+    document.getElementById('adminPanel').style.display = 'none';
+    showMessage("تم قطع الاتصال.");
+  });
+  document.getElementById('refreshBtn')?.addEventListener('click', refreshDashboard);
+  document.getElementById('testSoundBtn')?.addEventListener('click', playTestSound);
+  document.getElementById('addNotifBtn')?.addEventListener('click', () => addNotificationToDB(document.getElementById('notifTitle').value, document.getElementById('notifBody').value));
+  document.getElementById('startLiveBtn')?.addEventListener('click', () => addStream(true));
+  document.getElementById('saveLiveDraftBtn')?.addEventListener('click', () => addStream(false));
+  document.getElementById('stopAllLiveBtn')?.addEventListener('click', async () => {
+    const err = await stopAllLive();
+    if (err) { showMessage("فشل: " + err.message, true); return; }
+    showMessage("⏹ تم إيقاف البث");
+    await loadStreams();
+  });
+  document.getElementById('camPreviewBtn')?.addEventListener('click', openCamera);
+  document.getElementById('camStartBtn')?.addEventListener('click', startCameraBroadcast);
+  document.getElementById('camStopBtn')?.addEventListener('click', () => stopCameraBroadcast());
+  document.getElementById('copySqlBtn')?.addEventListener('click', () => {
+    navigator.clipboard.writeText(LIVE_SQL).then(() => showMessage("📋 تم نسخ الكود"), () => showMessage("تعذر النسخ", true));
+  });
+</script>
+</body>
+</html>
